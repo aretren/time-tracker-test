@@ -1,6 +1,6 @@
 {
-  "short_name": "TimeTracker",
-  "name": "Time Tracker",
+  "short_name": "TimeTracker-test",
+  "name": "Time Tracker - test",
   "icons": [
     {
       "src": "favicon.ico",
@@ -13,7 +13,7 @@
       "sizes": "512x512"
     }
   ],
-  "start_url": "https://aretren.github.io/time-tracker/participant.html",
+  "start_url": "https://aretren.github.io/time-tracker-test/participant.html",
   "display": "standalone",
   "theme_color": "#000000",
   "background_color": "#ffffff"
