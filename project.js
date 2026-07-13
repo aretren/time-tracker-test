@@ -37,7 +37,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const scheduleGridEl = document.getElementById('combined-schedule-grid');
     const participantListEl = document.getElementById('participant-list');
     const trainingListEl = document.getElementById('training-list');
-    const backToProjectsBtn = document.getElementById('back-to-projects-btn');
+    const backToParticipantBtn = document.getElementById('back-to-participant-btn');
+    const backToParticipantProjectBtn = document.getElementById('back-to-participant-project-btn');
     const responsibleUserSelect = document.getElementById('responsible-user-select');
     const locationsRef = database.ref('locations');
     const materialsWidget = document.getElementById('materials-widget');
@@ -62,7 +63,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const imageViewerContent = document.getElementById('image-viewer-content');
     const addMaterialModal = document.getElementById('add-material-modal');
     const closeAddMaterialModalBtn = addMaterialModal.querySelector('.close-btn');
-    const materialTypeSelection = document.getElementById('material-type-selection');
+    const showAddMaterialModalBtn = document.getElementById('show-add-material-modal-btn');
+    const addMaterialForm = document.getElementById('add-material-form');
+    const materialParticipantSelect = document.getElementById('material-participant-select');
+    const materialTypeSelect = document.getElementById('material-type-select');
+    const materialDynamicFormContent = document.getElementById('material-dynamic-form-content');
+    const projectActionsWidget = document.getElementById('project-actions-widget');
+    const archiveProjectBtn = document.getElementById('archive-project-btn');
+    const deleteProjectBtn = document.getElementById('delete-project-btn');
 
     // --- STATE ---
     let selectedDate = new Date();
@@ -76,11 +84,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let isHighlighting = false;
     let canEditMaterials = false; // Permission flag
     let highlightsCache = {};
+    let actionButtonsInitialized = false;
 
     // --- INITIALIZATION ---
-    if (backToProjectsBtn) {
-        backToProjectsBtn.addEventListener('click', () => { window.location.href = 'admin.html'; });
-    }
     initializeCalendar();
     
     // --- UI INTERACTIVITY (WIDGETS) ---
@@ -94,17 +100,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (materialsWidget) {
         const header = materialsWidget.querySelector('h2');
-        header.classList.add('collapsible-header');
         const content = document.getElementById('materials-content');
+
+        // Collapse by default
+        materialsWidget.classList.add('collapsed');
+        content.classList.add('hidden');
+
         header.addEventListener('click', () => {
-            const isCollapsed = content.classList.toggle('hidden');
-            header.parentElement.classList.toggle('collapsed', isCollapsed);
+            const isNowHidden = content.classList.toggle('hidden');
+            materialsWidget.classList.toggle('collapsed', isNowHidden);
         });
     }
 
     // --- MATERIALS LOGIC ---
-    const API_KEY = 'chv_v7pN_404b0e793451e27b444d3e9ee4e354c35359fbb9d4b8a70342659b3d9842d553c3a516066c6a2b31ddb892e00425dc8e08d1ecd26e579f55773ee79ab369f521';
-
     const getMaterialInfoFromElement = (element) => {
         const item = element.closest('.material-item');
         const userContainer = element.closest('.material-user-container');
@@ -134,21 +142,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Open image in modal
-        if (target.closest('.photo-thumbnail') && !target.classList.contains('delete-photo-btn')) {
-            const imgSrc = target.closest('img').src;
-            if (imgSrc) {
-                imageViewerContent.src = imgSrc;
-                imageViewerModal.classList.add('visible');
-            }
-            return;
-        }
+        if (target.closest('.photo-thumbnail')) {
+            const thumb = target.closest('.photo-thumbnail');
+            const info = getMaterialInfoFromElement(thumb);
+            const photoId = thumb.dataset.photoid;
+            const imgSrc = thumb.querySelector('img')?.src;
 
-        // Delete photo
-        if (target.classList.contains('delete-photo-btn')) {
-            const info = getMaterialInfoFromElement(target);
-            const photoId = target.closest('.photo-thumbnail').dataset.photoid;
-            if (info && photoId && confirm('Удалить это фото?')) {
-                projectRef.child('materials').child(info.username).child(info.materialType).child(info.itemId).child('photos').child(photoId).remove();
+            if (imgSrc && info && photoId) {
+                imageViewerContent.src = imgSrc;
+                const deleteContext = {
+                    username: info.username,
+                    materialType: info.materialType,
+                    itemId: info.itemId,
+                    photoId: photoId
+                };
+                imageViewerModal.dataset.deleteContext = JSON.stringify(deleteContext);
+                
+                const deleteBtn = document.getElementById('image-viewer-delete-btn');
+                if(canEditMaterials) {
+                     deleteBtn.classList.remove('hidden');
+                } else {
+                     deleteBtn.classList.add('hidden');
+                }
+
+                imageViewerModal.classList.add('visible');
             }
             return;
         }
@@ -192,6 +209,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'tasks':
                     renderTaskForm(itemEl, username, itemId, data);
                     break;
+                case 'notes':
+                    renderNoteForm(itemEl, username, itemId, data);
+                    break;
             }
         }
     });
@@ -215,61 +235,176 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const uploadImage = async (file) => {
+        const apiKey = 'a29a659a810c0bc31aadb00ea280227b';
         const formData = new FormData();
-        formData.append('source', file);
+        formData.append('image', file);
+
         try {
-            const response = await fetch('https://radikal.cloud/api/1/upload', {
+            const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
                 method: 'POST',
-                headers: {
-                    'X-API-Key': API_KEY
-                },
                 body: formData,
             });
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+            }
+
             const result = await response.json();
-            if (result.status_code === 200 && result.image?.url) {
-                return result.image.url;
+
+            if (result.success && result.data?.url) {
+                return result.data.url;
             } else {
-                throw new Error(result.error?.message || 'URL не найден в ответе API.');
+                throw new Error(result.error?.message || 'URL не найден в ответе API ImgBB.');
             }
         } catch (error) {
-            console.error('Ошибка загрузки изображения:', error);
+            console.error('Ошибка загрузки изображения в ImgBB:', error);
             alert(`Ошибка загрузки изображения: ${error.message}`);
             return null;
         }
     };
     
     // --- MODAL HANDLING ---
+    const hideAddMaterialModal = () => {
+        addMaterialModal.classList.remove('visible');
+        addMaterialForm.reset();
+        materialDynamicFormContent.innerHTML = '';
+    };
 
-    closeAddMaterialModalBtn.addEventListener('click', () => addMaterialModal.classList.remove('visible'));
+    closeAddMaterialModalBtn.addEventListener('click', hideAddMaterialModal);
+    window.addEventListener('click', (e) => { 
+        if (e.target === addMaterialModal) hideAddMaterialModal();
+    });
 
-    materialTypeSelection.addEventListener('click', (e) => {
-        if (e.target.tagName === 'BUTTON') {
-            const type = e.target.dataset.type;
-            const username = addMaterialModal.dataset.username;
-            const container = document.querySelector(`.material-items-container[data-username="${username}"]`);
-            if (!container) return;
+    showAddMaterialModalBtn.addEventListener('click', () => {
+        // Reset form state
+        addMaterialForm.reset();
+        materialDynamicFormContent.innerHTML = '';
 
-            const formContainer = document.createElement('div');
-            container.prepend(formContainer);
+        const participantGroup = document.getElementById('material-participant-group');
+        
+        if (canEditMaterials) {
+            participantGroup.style.display = 'block';
+            materialParticipantSelect.innerHTML = '<option value="__general">Общий материал</option>';
+            Object.keys(projectMembers).forEach(username => {
+                const option = document.createElement('option');
+                option.value = username;
+                option.textContent = username;
+                materialParticipantSelect.appendChild(option);
+            });
+        } else {
+            // For regular users, hide the selector and default to themselves
+            participantGroup.style.display = 'none';
+        }
+        
+        addMaterialModal.classList.add('visible');
+    });
 
-            switch (type) {
-                case 'party': renderPartyForm(formContainer, username); break;
-                case 'costume': renderCostumeForm(formContainer, username); break;
-                case 'task': renderTaskForm(formContainer, username); break;
-            }
-            addMaterialModal.classList.remove('visible');
+    materialTypeSelect.addEventListener('change', (e) => {
+        const type = e.target.value;
+        materialDynamicFormContent.innerHTML = ''; // Clear previous form
+
+        switch (type) {
+            case 'party':
+                materialDynamicFormContent.innerHTML = `
+                    <div class="form-group"><input type="text" id="material-name" placeholder="Название" required></div>
+                    <div class="form-group"><textarea id="material-description" placeholder="Описание"></textarea></div>
+                    <div class="form-group"><label for="material-photo">Изображение</label><input type="file" id="material-photo" accept="image/*"></div>`;
+                break;
+            case 'costume':
+                materialDynamicFormContent.innerHTML = `
+                    <div class="form-group"><input type="text" id="material-name" placeholder="Название предмета" required></div>
+                    <div class="form-group"><input type="text" id="material-link" placeholder="Ссылка"></div>
+                    <div class="form-group"><label for="material-photo">Изображение</label><input type="file" id="material-photo" accept="image/*"></div>`;
+                break;
+            case 'task':
+                materialDynamicFormContent.innerHTML = `
+                    <div class="form-group"><input type="text" id="material-name" placeholder="Название задачи" required></div>
+                    <div class="form-group"><textarea id="material-description" placeholder="Описание"></textarea></div>`;
+                break;
+            case 'note':
+                materialDynamicFormContent.innerHTML = `
+                    <div class="form-group"><input type="text" id="material-name" placeholder="Название" required></div>
+                    <div class="form-group"><textarea id="material-description" placeholder="Описание"></textarea></div>
+                    <div class="form-group"><label for="material-photo">Изображение</label><input type="file" id="material-photo" accept="image/*"></div>`;
+                break;
         }
     });
 
+    addMaterialForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const type = materialTypeSelect.value;
+        const name = document.getElementById('material-name')?.value.trim();
+        const photoFile = document.getElementById('material-photo')?.files[0];
+
+        if (!type || !name) {
+            alert('Пожалуйста, выберите тип и введите название.');
+            return;
+        }
+        
+        const targetUser = canEditMaterials ? materialParticipantSelect.value : loggedInUser;
+        const materialTypePlural = type + 's'; // e.g., 'note' -> 'notes'
+
+        // Show a loading indicator if you have one
+        // e.g., submitButton.disabled = true; submitButton.textContent = 'Сохранение...';
+
+        let imageUrl = null;
+        if (photoFile) {
+            try {
+                imageUrl = await uploadImage(photoFile);
+            } catch (error) {
+                alert('Не удалось загрузить изображение. Попробуйте сохранить без него.');
+                // Re-enable button and return
+                // e.g., submitButton.disabled = false; submitButton.textContent = 'Сохранить';
+                return;
+            }
+        }
+
+        let data = { name };
+
+        switch (type) {
+            case 'party':
+            case 'note':
+                 data.description = document.getElementById('material-description')?.value.trim();
+                 break;
+            case 'costume':
+                data.link = document.getElementById('material-link')?.value.trim();
+                break;
+            case 'task':
+                data.description = document.getElementById('material-description')?.value.trim();
+                data.status = 'incomplete';
+                break;
+        }
+
+        // If an image was uploaded, add it to the data
+        if (imageUrl) {
+            data.photos = {};
+            const newPhotoKey = database.ref().push().key;
+            data.photos[newPhotoKey] = imageUrl;
+        }
+        
+        projectRef.child('materials').child(targetUser).child(materialTypePlural).push().set(data);
+
+        hideAddMaterialModal();
+    });
+
+
     closeImageViewerBtn.addEventListener('click', () => imageViewerModal.classList.remove('visible'));
+    document.getElementById('image-viewer-delete-btn').addEventListener('click', () => {
+        const context = JSON.parse(imageViewerModal.dataset.deleteContext || '{}');
+        if (context.username && context.photoId && confirm('Удалить это фото?')) {
+            projectRef.child('materials').child(context.username).child(context.materialType).child(context.itemId).child('photos').child(context.photoId).remove();
+            imageViewerModal.classList.remove('visible');
+        }
+    });
     
     window.addEventListener('click', (e) => {
         if (e.target === imageViewerModal) {
             imageViewerModal.classList.remove('visible');
         }
         if (e.target === addMaterialModal) {
-            addMaterialModal.classList.remove('visible');
+            hideAddMaterialModal();
         }
     });
 
@@ -278,24 +413,38 @@ document.addEventListener('DOMContentLoaded', () => {
     const renderMaterials = (members, materials = {}) => {
         const materialsContent = document.getElementById('materials-content');
         materialsContent.innerHTML = '';
-        const memberUsernames = members ? Object.keys(members) : [];
 
-        if (memberUsernames.length === 0) {
-            materialsContent.innerHTML = '<p style="padding: 0.75rem 0;">Сначала добавьте участников в проект.</p>';
+        showAddMaterialModalBtn.style.display = canEditMaterials ? 'block' : 'none';
+
+        const usersWithMaterials = Object.keys(materials || {}).filter(u => u !== '__general');
+        const generalMaterialsExist = Object.keys(materials?.__general || {}).length > 0;
+
+        // If no materials at all (including general), show message and return
+        if (usersWithMaterials.length === 0 && !generalMaterialsExist) {
+            materialsContent.innerHTML = '<p style="padding: 0.75rem 0;">Материалов пока нет.</p>';
             return;
         }
 
-        memberUsernames.forEach(username => {
-            const userMaterials = materials[username] || {};
+        let hasAnyContent = false; // Keep this to determine overall message if needed
+
+        const renderSectionForUser = (username) => {
+            const userMaterials = materials?.[username] || {};
+
+            // Only render if there are materials for this user
+            if (Object.keys(userMaterials).length === 0) {
+                return;
+            }
+
+            hasAnyContent = true; // Mark that content was rendered
             const userContainer = document.createElement('div');
             userContainer.className = 'material-user-container';
             userContainer.dataset.username = username;
 
-            const addButtonHTML = canEditMaterials ? `<button class="add-material-btn" data-username="${username}">+</button>` : '';
+            const headerText = username === '__general' ? 'Общие материалы' : username;
+            
             userContainer.innerHTML = `
                 <div class="material-user-header">
-                    <h3>${username}</h3>
-                    ${addButtonHTML}
+                    <h3>${headerText}</h3>
                 </div>
                 <div class="material-items-container" data-username="${username}"></div>
             `;
@@ -307,26 +456,45 @@ document.addEventListener('DOMContentLoaded', () => {
                     Object.entries(userMaterials[type]).forEach(([id, data]) => {
                         const itemContainer = document.createElement('div');
                         itemsContainer.appendChild(itemContainer);
-                        renderFunc(itemContainer, username, id, data);
+                        renderFunc(itemContainer, username, id, data); // canEditMaterials is a global var
                     });
                 }
             };
-            
+
             renderAllItems('parties', renderPartyItem);
             renderAllItems('costumes', renderCostumeItem);
             renderAllItems('tasks', renderTaskItem);
+            renderAllItems('notes', renderNoteItem);
+
+            // No need for itemsContainer.children.length === 0 check here,
+            // as we already filtered out users without materials
+        }
+
+        // Render general materials first if they exist
+        if (generalMaterialsExist) {
+            renderSectionForUser('__general');
+        }
+
+        // Then render all other users who have materials
+        usersWithMaterials.forEach(username => {
+            renderSectionForUser(username);
         });
+
+        // This final check is probably redundant now, but harmless.
+        if (!hasAnyContent) {
+            materialsContent.innerHTML = '<p style="padding: 0.75rem 0;">Материалов пока нет.</p>';
+        }
     };
 
     const renderPartyItem = (container, username, partyId, partyData) => {
         const actionsHTML = canEditMaterials ? `
             <div class="material-item-actions">
-                <button class="edit-material-btn">Редактировать</button>
-                <button class="delete-material-btn">Удалить</button>
+                <button class="edit-material-btn" title="Редактировать">✏️</button>
+                <button class="delete-material-btn" title="Удалить">🗑️</button>
             </div>` : '';
 
         const photosHTML = partyData.photos ? Object.entries(partyData.photos).map(([photoId, url]) => `
-            <div class="photo-thumbnail" data-photoid="${photoId}"><img src="${url}" alt="Фото партии"><button class="delete-photo-btn ${canEditMaterials ? '' : 'hidden'}">&times;</button></div>`).join('') : '';
+            <div class="photo-thumbnail" data-photoid="${photoId}"><img src="${url}" alt="Фото партии"></div>`).join('') : '';
 
         container.className = 'material-item';
         container.dataset.id = partyId;
@@ -346,12 +514,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const renderCostumeItem = (container, username, costumeId, costumeData) => {
         const actionsHTML = canEditMaterials ? `
             <div class="material-item-actions">
-                <button class="edit-material-btn">Редактировать</button>
-                <button class="delete-material-btn">Удалить</button>
+                <button class="edit-material-btn" title="Редактировать">✏️</button>
+                <button class="delete-material-btn" title="Удалить">🗑️</button>
             </div>` : '';
 
         const photosHTML = costumeData.photos ? Object.entries(costumeData.photos).map(([photoId, url]) => `
-            <div class="photo-thumbnail" data-photoid="${photoId}"><img src="${url}" alt="Фото костюма"><button class="delete-photo-btn ${canEditMaterials ? '' : 'hidden'}">&times;</button></div>`).join('') : '';
+            <div class="photo-thumbnail" data-photoid="${photoId}"><img src="${url}" alt="Фото костюма"></div>`).join('') : '';
+        
+        const linkHTML = costumeData.link ? `<div class="material-link-container"><a href="${costumeData.link}" target="_blank" rel="noopener noreferrer">🔗 Ссылка на товар</a></div>` : '';
 
         container.className = 'material-item';
         container.dataset.id = costumeId;
@@ -361,7 +531,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h4>Костюм: ${costumeData.name}</h4>
                 ${actionsHTML}
             </div>
-            <p>${costumeData.link ? `<a href="${costumeData.link}" target="_blank">Ссылка на товар</a>` : ''}</p>
+            ${linkHTML}
             <div class="photo-gallery">${photosHTML}</div>
             <input type="file" class="add-photo-input" multiple accept="image/*" style="display:none;">
             <button class="add-photo-btn ${canEditMaterials ? '' : 'hidden'}">Добавить фото</button>
@@ -369,25 +539,43 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const renderTaskItem = (container, username, taskId, taskData) => {
-        const actionsHTML = canEditMaterials ? `
-            <div class="material-item-actions">
-                <button class="edit-material-btn">Редактировать</button>
-                <button class="delete-material-btn">Удалить</button>
-            </div>` : '';
-        
-        container.className = 'material-item task-item';
-        if (taskData.status === 'completed') container.classList.add('completed');
+        const toggleBtnHTML = canEditMaterials ? `<button class="toggle-task-status-btn" title="Изменить статус">${taskData.status === 'completed' ? '✔️' : '⭕'}</button>` : '';
+        const actionsHTML = canEditMaterials ? `<div class="material-item-actions">${toggleBtnHTML}<button class="edit-material-btn" title="Редактировать">✏️</button><button class="delete-material-btn" title="Удалить">🗑️</button></div>` : '';
+
+        container.className = `material-item task-item ${taskData.status === 'completed' ? 'completed' : ''}`;
         container.dataset.id = taskId;
         container.dataset.type = 'tasks';
         container.innerHTML = `
-            <div class="task-content">
-                <div class="material-item-header">
-                    <h4>Задача: ${taskData.name}</h4>
-                    ${actionsHTML}
-                </div>
-                <p>${taskData.description}</p>
+            <div class="material-item-header">
+                <h4>Задача: ${taskData.name}</h4>
+                ${actionsHTML}
             </div>
-            <button class="toggle-task-status-btn ${canEditMaterials ? '' : 'hidden'}">${taskData.status === 'completed' ? 'Не выполнено' : 'Выполнено'}</button>
+            <p>${taskData.description || ''}</p>
+        `;
+    };
+
+    const renderNoteItem = (container, username, noteId, noteData) => {
+        const actionsHTML = canEditMaterials ? `
+            <div class="material-item-actions">
+                <button class="edit-material-btn" title="Редактировать">✏️</button>
+                <button class="delete-material-btn" title="Удалить">🗑️</button>
+            </div>` : '';
+
+        const photosHTML = noteData.photos ? Object.entries(noteData.photos).map(([photoId, url]) => `
+            <div class="photo-thumbnail" data-photoid="${photoId}"><img src="${url}" alt="Фото заметки"></div>`).join('') : '';
+
+        container.className = 'material-item';
+        container.dataset.id = noteId;
+        container.dataset.type = 'notes';
+        container.innerHTML = `
+            <div class="material-item-header">
+                <h4>Заметка: ${noteData.name}</h4>
+                ${actionsHTML}
+            </div>
+            <p>${noteData.description || ''}</p>
+            <div class="photo-gallery">${photosHTML}</div>
+            <input type="file" class="add-photo-input" multiple accept="image/*" style="display:none;">
+            <button class="add-photo-btn ${canEditMaterials ? '' : 'hidden'}">Добавить фото</button>
         `;
     };
 
@@ -486,6 +674,37 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     };
 
+    const renderNoteForm = (container, username, noteId = null, existingData = {}) => {
+        const isEditing = !!noteId;
+        container.className = 'material-item add-form';
+        container.innerHTML = `
+            <h4>${isEditing ? 'Редактировать заметку' : 'Новая заметка'}</h4>
+            <div class="form-group"><input type="text" placeholder="Название" value="${existingData.name || ''}"></div>
+            <div class="form-group"><textarea placeholder="Описание">${existingData.description || ''}</textarea></div>
+            <button class="save-btn">Сохранить</button>
+            <button class="cancel-btn">Отмена</button>
+        `;
+        container.querySelector('.save-btn').onclick = () => {
+            const name = container.querySelector('input').value.trim();
+            if (!name) { alert('Название не может быть пустым.'); return; }
+            const description = container.querySelector('textarea').value.trim();
+            
+            const ref = isEditing 
+                ? projectRef.child('materials').child(username).child('notes').child(noteId)
+                : projectRef.child('materials').child(username).child('notes').push();
+            
+            ref.set({ name, description, photos: existingData.photos || null });
+            if (!isEditing) container.remove();
+        };
+        container.querySelector('.cancel-btn').onclick = () => {
+            if (isEditing) {
+                renderNoteItem(container, username, noteId, existingData);
+            } else {
+                container.remove();
+            }
+        };
+    };
+
     const renderParticipants = (members) => {
         participantListEl.innerHTML = '';
         const memberUsernames = members ? Object.keys(members) : [];
@@ -550,6 +769,9 @@ document.addEventListener('DOMContentLoaded', () => {
             projectInfoContainer.appendChild(usernameDisplay);
             usernameDisplay.classList.remove('hidden');
             titleContainer.appendChild(projectInfoContainer);
+
+            backToParticipantBtn.onclick = () => { window.location.href = 'participant.html'; };
+            backToParticipantProjectBtn.href = `participant_project.html?id=${projectId}`;
             
             const canManageProject = isCurrentUserAdmin || (isProjectResponsible && !isCurrentUserAdmin);
             
@@ -557,14 +779,41 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('participants-widget').style.display = isCurrentUserAdmin ? 'block' : 'none';
             document.getElementById('responsible-widget').style.display = isCurrentUserAdmin ? 'block' : 'none';
             
-            if (isProjectResponsible && !isCurrentUserAdmin) {
-                backToProjectsBtn.onclick = () => { window.location.href = 'participant.html'; };
-            } else {
-                backToProjectsBtn.onclick = () => { window.location.href = 'admin.html'; };
-            }
-
             if (isCurrentUserAdmin) {
                 usernameDisplay.textContent = `Администратор: ${loggedInUser}`;
+
+                // --- PROJECT ACTIONS (DELETE/ARCHIVE) ---
+                projectActionsWidget.classList.remove('hidden');
+
+                // Set button text based on archive status
+                archiveProjectBtn.textContent = projectData.isArchived ? 'Разархивировать проект' : 'Архивировать проект';
+                archiveProjectBtn.style.backgroundColor = projectData.isArchived ? 'var(--status-free)' : 'var(--status-uncertain)';
+                
+                if (!actionButtonsInitialized) {
+                    archiveProjectBtn.addEventListener('click', () => {
+                        const newStatus = !projectData.isArchived;
+                        const actionText = newStatus ? 'архивировать' : 'разархивировать';
+                        if (confirm(`Вы уверены, что хотите ${actionText} проект "${projectData.name}"?`)) {
+                            projectRef.child('isArchived').set(newStatus);
+                        }
+                    });
+
+                    deleteProjectBtn.addEventListener('click', () => {
+                        if (confirm(`ВНИМАНИЕ! Вы уверены, что хотите ПОЛНОСТЬЮ удалить проект "${projectData.name}"? Это действие необратимо.`)) {
+                            projectRef.remove().then(() => {
+                                alert('Проект удален.');
+                                window.location.href = 'participant.html';
+                            }).catch(err => {
+                                alert('Ошибка при удалении проекта: ' + err.message);
+                            });
+                        }
+                    });
+                    actionButtonsInitialized = true;
+                }
+
+            } else if (isProjectResponsible) {
+                usernameDisplay.textContent = `Ответственный: ${loggedInUser}`;
+                projectActionsWidget.classList.add('hidden');
             }
 
             // Render all components
@@ -660,11 +909,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         <p><strong>Комментарий:</strong> <span class="training-comment-text">${commentText}</span></p>
                     </div>
                     <div class="training-actions">
-                        ${canManage ? '<button class="edit-training-btn">Редактировать</button>' : ''}
+                        
                     </div>
                 `;
                 if(canManage) {
-                    li.querySelector('.edit-training-btn').onclick = (e) => editTraining(id, training, li, e);
+                    const actionsContainer = li.querySelector('.training-actions');
+                    const editBtn = document.createElement('button');
+                    editBtn.className = 'edit-training-btn';
+                    editBtn.innerHTML = '✏️';
+                    editBtn.title = 'Редактировать';
+                    editBtn.onclick = (event) => editTraining(id, training, li, event);
+                    actionsContainer.appendChild(editBtn);
                 }
                 trainingListEl.appendChild(li);
             });
@@ -685,7 +940,40 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const newTraining = { startTime, endTime, comment, location };
         if (!location) delete newTraining.location;
-        projectRef.child('trainings').push().set(newTraining);
+        
+        projectRef.child('trainings').push().set(newTraining).then(() => {
+            // --- OneSignal Notification ---
+            const participants = Object.keys(projectMembers || {});
+            if (participants.length > 0) {
+                const ONE_SIGNAL_APP_ID = '78a94261-63d9-4091-a85a-61725f3f5fa6';
+                const ONE_SIGNAL_API_KEY = '7knc5bdr4evg477ltl53xvig6'; // WARNING: Insecure
+                
+                const notification = {
+                    app_id: ONE_SIGNAL_APP_ID,
+                    include_external_user_ids: participants,
+                    headings: { "en": `Новая тренировка в проекте ${projectData.name}` },
+                    contents: { "en": `Время: ${new Date(startTime).toLocaleString('ru-RU')} - ${new Date(endTime).toLocaleString('ru-RU')}` },
+                };
+
+                fetch("https://onesignal.com/api/v1/notifications", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json; charset=utf-8",
+                        "Authorization": "Basic " + ONE_SIGNAL_API_KEY,
+                    },
+                    body: JSON.stringify(notification),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('OneSignal Response:', data);
+                })
+                .catch(error => {
+                    console.error('Error sending OneSignal notification:', error);
+                });
+            }
+            // --- End OneSignal Notification ---
+        });
+        
         addTrainingForm.reset();
         hideAddTrainingModal();
     }
@@ -854,14 +1142,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     hourCell.className = 'hour-cell';
                     const segments = dayData[hour] || [];
                     const statuses = Array.isArray(segments) ? segments : Object.values(segments);
-                    const isTraining = userTrainingsOnDate.some(t => t.startTime < new Date(date.setHours(hour + 1, 0, 0, 0)) && t.endTime > new Date(date.setHours(hour, 0, 0, 0)));
-                    let hasConflict = false;
+                    const isTraining = userTrainingsOnDate.some(t => {
+                        const hourStart = new Date(date);
+                        hourStart.setHours(hour, 0, 0, 0);
+                        const hourEnd = new Date(date);
+                        hourEnd.setHours(hour + 1, 0, 0, 0);
+                        return t.startTime < hourEnd && t.endTime > hourStart;
+                    });
                     if (isTraining) {
-                        if (statuses.includes('busy')) { hourCell.classList.add('conflict-busy-training'); hasConflict = true; }
-                        else if (statuses.includes('undefined')) { hourCell.classList.add('conflict-undefined-training'); hasConflict = true; }
-                        else { hourCell.classList.add('is-training-hour'); }
-                    }
-                    if (statuses.length > 0 && !hasConflict) {
+                        if (statuses.includes('busy')) {
+                            hourCell.style.background = 'linear-gradient(135deg, var(--status-busy) 49%, var(--status-training) 51%)';
+                            hasConflict = true;
+                        } else if (statuses.includes('undefined')) {
+                            hourCell.style.background = 'linear-gradient(135deg, var(--status-uncertain) 49%, var(--status-training) 51%)';
+                            hasConflict = true;
+                        } else {
+                            hourCell.classList.add('is-training-hour');
+                        }
+                    } else if (statuses.length > 0) {
                         const statusCounts = statuses.reduce((acc, s) => { acc[s] = (acc[s] || 0) + 1; return acc; }, {});
                         Object.entries(statusCounts).forEach(([st, c]) => {
                              if(st !== 'clear') {
@@ -886,9 +1184,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (project.members && project.members[username] && project.trainings) {
                 for (const trainId in project.trainings) {
                     const training = project.trainings[trainId];
+                    let startDate, endTime;
+
                     if (training.startTime) {
-                        const startDate = new Date(training.startTime);
-                        if (startDate.toDateString() === checkDateStr) userTrainings.push({ startTime: startDate, endTime: new Date(training.endTime) });
+                        startDate = new Date(training.startTime);
+                        endTime = training.endTime ? new Date(training.endTime) : new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+                    } else if (training.time) {
+                        startDate = new Date(training.time);
+                        endTime = new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // Assume 2 hour duration for legacy data
+                    }
+
+                    if (startDate && startDate.toDateString() === checkDateStr) {
+                        userTrainings.push({ startTime: startDate, endTime: endTime });
                     }
                 }
             }

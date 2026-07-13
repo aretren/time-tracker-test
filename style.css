@@ -166,10 +166,10 @@ h1 {
 }
 
 button {
-    background-color: var(--primary-color);
-    color: var(--white);
+    background-color: rgba(255, 255, 255, 0.5);
+    color: var(--dark-text);
     padding: 0.85rem 1.5rem;
-    border: none;
+    border: 1px solid var(--border-color);
     border-radius: 8px;
     cursor: pointer;
     font-size: 1rem;
@@ -180,7 +180,7 @@ button {
 }
 
 button:hover {
-    background-color: var(--primary-hover);
+    background-color: rgba(255, 255, 255, 0.8);
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
 }
@@ -518,19 +518,55 @@ button:active {
     /* Добавляем padding и отрицательный margin для пространства под свечение */
     padding: 1.5rem 1.5rem 2.5rem 1.5rem; /* Увеличиваем нижний padding */
     margin-bottom: 1.5rem;
-    max-height: 1000px; /* Устанавливаем большой max-height для конечного состояния */
+    max-height: 10000px; /* Устанавливаем большой max-height для конечного состояния */
     position: relative; /* Необходимо для дочерних элементов */
     overflow: visible; /* Позволяет box-shadow выходить за пределы */
 }
 .widget h2 {
     font-size: 1.3rem;
-    margin-top: 0;
+    margin: 0;
+    flex-grow: 1;
+}
+
+.widget-header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 1rem;
     border-bottom: 1px solid var(--border-color);
     padding-bottom: 0.75rem;
 }
 
+
 /* --- Project Page Specific Layout --- */
+.project-card {
+    background: var(--glass-bg); /* Use glass background */
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--border-color);
+    border-radius: 16px; /* Match widget border-radius */
+    padding: 1rem;
+    margin-bottom: 1rem;
+    transition: box-shadow 0.2s ease-in-out;
+    cursor: pointer;
+    box-shadow: var(--glow-shadow); /* Add glow shadow */
+    animation: block-appear 0.5s ease-out forwards; /* Add block-appear animation */
+}
+
+
+.project-card {
+    background: var(--glass-bg); /* Use glass background */
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--border-color);
+    border-radius: 16px; /* Match widget border-radius */
+    padding: 1rem;
+    margin-bottom: 1rem;
+    transition: box-shadow 0.2s ease-in-out;
+    cursor: pointer;
+    box-shadow: var(--glow-shadow); /* Add glow shadow */
+    animation: block-appear 0.5s ease-out forwards; /* Add block-appear animation */
+}
 .project-page-layout {
     display: flex;
     flex-direction: column;
@@ -553,6 +589,7 @@ button:active {
     text-align: left;
     border-radius: 8px;
     transition: background-color 0.2s ease;
+    flex-shrink: 0; /* Add this to prevent shrinking */
 }
 .header-action-btn { margin-left: 1rem; }
 
@@ -677,24 +714,44 @@ button:active {
     cursor: pointer;
     position: relative;
     user-select: none; /* Prevent text selection on click */
+    min-height: 1.5rem; /* Ensure minimum height, matching font-size of arrow */
+    flex-shrink: 0; /* Prevent from shrinking in flex container */
+    display: flex;
+    align-items: center;
 }
 
-.widget h2.collapsible-header::after {
-    content: '−'; /* Minus sign for expanded */
-    position: absolute;
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    font-weight: bold;
+.widget h2.collapsible-header::before {
+    content: '▾';
     font-size: 1.5rem;
     line-height: 1;
+    transition: transform 0.3s ease;
+    margin-right: 0.75rem; /* Space between arrow and text */
+    display: inline-block;
+    transform-origin: center;
 }
 
-.widget.collapsed h2.collapsible-header::after {
-    content: '+'; /* Plus sign for collapsed */
+/* Add spacing to simple widget headers */
+.widget > h2 {
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
 }
 
-.widget.collapsed > *:not(h2) {
+.widget-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#add-training-btn {
+    background-color: rgba(255, 255, 255, 0.5);
+}
+
+.widget.collapsed h2.collapsible-header::before {
+    transform: rotate(-90deg);
+}
+
+.widget.collapsed > *:not(.widget-header):not(h2) {
     max-height: 0;
     padding-top: 0;
     padding-bottom: 0;
@@ -843,7 +900,7 @@ button:active {
 }
 
 .air-datepicker-cell.highlight-project-training {
-    background-color: #a0c4ff !important; /* Blue for this project's trainings */
+    background-color: #a0c4ff; /* Blue for this project's trainings */
     color: var(--dark-text);
 }
 
@@ -856,6 +913,17 @@ button:active {
     background-color: #ffd180 !important; /* An amber/orange color */
     color: var(--dark-text);
 }
+
+.air-datepicker-cell.training-day-no-color {
+    background-color: rgba(255, 255, 255, 0.5);
+}
+
+.air-datepicker-cell.past-training {
+    background-color: #d3d3d3 !important; /* Light grey */
+    opacity: 0.6;
+    color: #333;
+}
+
 
 
 /* --- Desktop Layout --- */
@@ -938,16 +1006,17 @@ button:active {
     width: auto;
     text-decoration: none;
     padding: 0.75rem 1.5rem;
-    background-color: var(--primary-color);
-    color: var(--white);
+    background-color: rgba(255, 255, 255, 0.5);
+    color: var(--dark-text);
     border-radius: 8px;
     align-self: center;
     text-align: center;
     transition: all 0.2s ease;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--border-color);
 }
 .button-link:hover {
-     background-color: var(--primary-hover);
+     background-color: rgba(255, 255, 255, 0.8);
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
 }
@@ -1007,17 +1076,27 @@ button:active {
     overflow-y: auto;
 }
 .close-btn {
-    color: #9e9e9e;
     position: absolute;
-    top: 15px;
-    right: 25px;
+    top: 1.5rem; /* Standardized spacing */
+    right: 1.5rem; /* Standardized spacing */
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: rgba(0, 0, 0, 0.5);
+    color: white;
     font-size: 32px;
     font-weight: bold;
     cursor: pointer;
-    transition: color 0.2s;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1003;
+    text-shadow: none;
 }
 .close-btn:hover {
-    color: var(--dark-text);
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
 }
 .user-checkbox-list {
     max-height: 250px;
@@ -1055,16 +1134,17 @@ button:active {
     align-items: center;
     width: 40px;
     height: 40px;
+    min-width: 40px; /* Prevent shrinking below this size */
     background-color: rgba(255, 255, 255, 0.5);
     border-radius: 50%;
     text-decoration: none;
     color: var(--dark-text);
     font-weight: bold;
-    font-size: 1rem;
-    font-size: 1.5rem; /* Adjusted icon size */
+    font-size: 1.5rem;
     transition: all 0.2s ease;
     border: 1px solid var(--border-color);
-    padding: 0; /* Reset padding to ensure it's a circle */
+    padding: 0;
+    flex-shrink: 0; /* Prevent shrinking */
 }
 
 .header-btn:hover {
@@ -1079,6 +1159,7 @@ button:active {
     align-items: center;
     width: 40px;
     height: 40px;
+    min-width: 40px; /* Prevent shrinking below this size */
     background-color: rgba(255, 255, 255, 0.5);
     border-radius: 50%;
     text-decoration: none;
@@ -1086,7 +1167,7 @@ button:active {
     font-size: 1.5rem;
     transition: all 0.2s ease;
     border: 1px solid var(--border-color);
-    padding: 0; /* Reset padding to ensure it's a circle */
+    padding: 0;
     flex-shrink: 0; /* Prevent shrinking */
 }
 
@@ -1247,9 +1328,6 @@ button:active {
 }
 
 .task-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
 }
 
 .task-item.completed {
@@ -1452,7 +1530,9 @@ button:active {
 .brush-legend {
     display: inline-block;
     width: 20px;
+    min-width: 20px;
     height: 20px;
+    flex-shrink: 0;
     border-radius: 50%;
     margin-right: 0.75rem;
     border: 1px solid rgba(0,0,0,0.1);
@@ -1469,9 +1549,9 @@ button:active {
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    background-color: var(--primary-color);
-    color: white;
-    border: none;
+    background-color: rgba(255, 255, 255, 0.5);
+    color: var(--dark-text);
+    border: 1px solid var(--border-color);
     font-size: 1.8rem;
     display: flex; /* Keep flex for centering icon */
     justify-content: center;
@@ -1483,6 +1563,7 @@ button:active {
 }
 
 .fab:hover {
+    background-color: rgba(255, 255, 255, 0.8);
     transform: scale(1.1);
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
 }
@@ -1639,7 +1720,7 @@ button:active {
     opacity: 1;
 }
 
-.add-photo-btn, .toggle-task-status-btn {
+.add-photo-btn {
     margin-top: 0.5rem;
     padding: 0.5rem 1rem;
     font-size: 0.8rem;
@@ -1679,14 +1760,381 @@ button:active {
 }
 
 #image-viewer-modal .close-btn {
+    position: absolute;
+    top: 1.5rem; /* Standardized spacing */
+    right: 1.5rem; /* Standardized spacing */
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: rgba(0, 0, 0, 0.5);
     color: white;
-    font-size: 40px;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    font-size: 32px;
+    font-weight: bold;
+    text-shadow: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Removed line-height as flexbox handles vertical centering */
+    padding-top: 3px; /* Small adjustment for visual centering of 'x' */
+    z-index: 1002;
+    transition: background-color 0.2s;
+}
+
+#image-viewer-modal .close-btn:hover {
+    background-color: rgba(0, 0, 0, 0.8);
 }
 
 #image-viewer-content {
     max-width: 100%;
     max-height: 100%;
     border-radius: 8px;
+    position: relative; /* Ensure image creates a stacking context */
+    z-index: 1; /* Ensure image is below close button */
 }
 
+.delete-photo-modal-btn {
+    position: fixed;
+    bottom: 1.5rem; /* Standardized spacing */
+    right: 1.5rem; /* Standardized spacing */
+    background: rgba(255, 255, 255, 0.4);
+    color: var(--dark-text);
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 1002;
+}
+
+.delete-photo-modal-btn:hover {
+    background: rgba(255, 255, 255, 0.7); /* Lighter on hover */
+    transform: scale(1.1);
+}
+
+.delete-photo-modal-btn.hidden {
+    display: none;
+}
+
+/* Context Menu for Participant Project Page */
+.context-menu {
+    position: absolute;
+    z-index: 1001;
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--glow-shadow);
+    padding: 0.5rem;
+    min-width: 150px;
+}
+
+.context-menu-item {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background-color 0.2s;
+}
+
+.context-menu-item:hover {
+    background-color: rgba(255, 255, 255, 0.4);
+}
+
+/* --- New Material Styles (Icons & Links) --- */
+
+.material-link-container {
+    margin: 0.5rem 0;
+}
+
+.material-link-container a {
+    display: inline-block;
+    background-color: rgba(255, 255, 255, 0.3);
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    text-decoration: none;
+    color: var(--dark-text);
+    font-weight: 500;
+    transition: all 0.2s ease;
+    border: 1px solid var(--border-color);
+}
+
+.material-link-container a:hover {
+    background-color: rgba(255, 255, 255, 0.6);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.material-item-actions button {
+    font-size: 1.2rem; /* Make icons larger */
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border-radius: 50%; /* Make all action buttons circular */
+}
+
+.toggle-task-status-btn {
+    font-size: 1.5rem; /* Make status icon larger */
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+}
+
+.toggle-task-status-btn:hover {
+    background-color: rgba(0,0,0,0.05);
+}
+
+.material-item-actions .toggle-task-status-btn {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    font-size: 1.2rem;
+}
+
+/* --- Participant Page Project/Training List --- */
+#projects-container .project-card {
+    padding: 1.5rem;
+    margin-bottom: 1.5rem; /* Increased space between cards */
+    background: rgba(255, 255, 255, 0.65); /* Slightly more opaque */
+    cursor: pointer; /* Ensure cursor indicates it's clickable */
+}
+
+#projects-container .project-card.not-member {
+    opacity: 0.7;
+    box-shadow: 0 4px 15px 0 rgba(0, 0, 0, 0.05);
+}
+
+#projects-container .project-card h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    padding: 0;
+    border: none;
+}
+
+.training-list-participant {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.training-list-participant li {
+    display: flex;
+    align-items: center;
+    padding: 0.6rem 0;
+    font-size: 0.95rem;
+    color: var(--dark-text);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.training-list-participant li:last-child {
+    border-bottom: none; /* Remove border from the last item */
+}
+
+.training-marker {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: var(--status-training); /* Use the blue training color */
+    margin-right: 1rem; /* Space between marker and text */
+    flex-shrink: 0; /* Prevent marker from shrinking */
+    box-shadow: 0 0 8px 1px var(--status-training); /* Add a subtle glow */
+}
+
+/* --- Project Color Picker --- */
+.project-title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.75rem;
+}
+
+.color-picker-btn {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    background-color: rgba(0, 0, 0, 0.08);
+    transition: background-color 0.2s;
+    font-size: 1.5rem;
+    line-height: 1;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.color-picker-btn:hover {
+    background-color: rgba(0, 0, 0, 0.2);
+}
+
+#color-picker-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1001;
+    display: none;
+    justify-content: center;
+    align-items: center;
+}
+
+#color-picker-container.visible {
+    display: flex;
+}
+
+.color-picker-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.color-picker-wheel {
+    position: relative;
+    z-index: 2;
+}
+
+.color-picker-wrapper {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.5rem;
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--glow-shadow);
+}
+
+.color-picker-reset-btn {
+    width: auto;
+    padding: 0.5rem 1.5rem;
+    font-size: 0.9rem;
+    background-color: rgba(255, 255, 255, 0.4);
+    color: var(--dark-text);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.color-picker-reset-btn:hover {
+    background-color: rgba(255, 255, 255, 0.7);
+}
+
+/* --- Participant Management Context Menu --- */
+.participants-management-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.create-user-form {
+    padding: 1.5rem;
+}
+
+.user-list-container {
+    padding: 1.5rem;
+}
+
+#participant-list .participant-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+#participant-list .participant-item:last-child {
+    border-bottom: none;
+}
+.participant-info {
+    font-weight: 500;
+}
+.participant-controls {
+    position: relative;
+}
+
+.context-menu-btn {
+    background: transparent;
+    border: none;
+    color: var(--dark-text);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0.2rem 0.5rem;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+    width: 40px;
+    height: 40px;
+}
+
+.context-menu-btn:hover {
+    background-color: rgba(0,0,0,0.1);
+}
+
+.participant-context-menu {
+    position: absolute;
+    z-index: 1050; /* Higher than modal content */
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    padding: 0.5rem;
+    min-width: 200px;
+    animation: block-appear 0.2s ease-out forwards;
+}
+
+.participant-context-menu .context-menu-item {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background-color 0.2s;
+    user-select: none;
+    font-weight: 500;
+    color: var(--dark-text);
+}
+
+.participant-context-menu .context-menu-item:hover {
+    background-color: rgba(255, 255, 255, 0.5);
+}
+
+.participant-context-menu .context-menu-item.delete {
+    color: var(--status-busy);
+}
+.participant-context-menu .context-menu-item.delete:hover {
+    background-color: rgba(255, 138, 128, 0.2);
+}
+
+.participant-context-menu .context-menu-item.disabled {
+    color: #9e9e9e;
+    cursor: not-allowed;
+    background-color: transparent;
+}

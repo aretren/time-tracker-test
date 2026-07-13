@@ -6,6 +6,10 @@
     <title>Информация о проекте</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/air-datepicker@3.3.5/air-datepicker.min.css">
     <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#000000">
+    <link rel="apple-touch-icon" href="favicon.ico">
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
 </head>
 <body>
     <div class="app-container">
@@ -14,6 +18,7 @@
                 <h1 id="project-name-header">Загрузка...</h1>
                 <span id="username-display"></span>
             </div>
+            <a href="#" id="edit-project-btn" class="header-btn hidden" title="Редактировать проект">&#9998;</a>
             <a href="participant.html" class="header-back-btn" title="К моим проектам">&#8592;</a>
         </header>
 
@@ -31,7 +36,10 @@
             <div class="management-column">
                 <!-- Блок для материалов -->
                 <div id="materials-widget" class="widget">
-                    <h2 class="collapsible-header">Мои материалы</h2>
+                    <div class="widget-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2 class="collapsible-header">Материалы</h2>
+                        <button id="show-add-material-modal-btn" class="header-action-btn" title="Добавить материал" style="width: auto; font-size: 1.5rem;">+</button>
+                    </div>
                     <div id="materials-content">
                         <!-- Сюда будет загружаться контент материалов -->
                     </div>
@@ -49,13 +57,37 @@
     <div id="image-viewer-modal" class="modal">
         <span class="close-btn" id="close-image-viewer-btn">&times;</span>
         <img class="modal-content" id="image-viewer-content">
+        <button id="image-viewer-delete-btn" class="delete-photo-modal-btn" title="Удалить фото">🗑️</button>
     </div>
 
-    <!-- Add Material Context Menu -->
-    <div id="add-material-menu" class="context-menu hidden">
-        <div class="context-menu-item" data-type="party">Добавить партию</div>
-        <div class="context-menu-item" data-type="costume">Добавить костюм</div>
-        <div class="context-menu-item" data-type="task">Добавить задачу</div>
+    <!-- Add Material Modal -->
+    <div id="add-material-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Добавить материал</h2>
+            <form id="add-material-form" class="add-form">
+                <div class="form-group" id="material-participant-group">
+                    <label for="material-participant-select">Назначить участнику</label>
+                    <select id="material-participant-select">
+                        <!-- Options will be populated by JS -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="material-type-select">Тип материала</label>
+                    <select id="material-type-select">
+                        <option value="">-- Выберите тип --</option>
+                        <option value="party">Партия</option>
+                        <option value="costume">Костюм</option>
+                        <option value="task">Задача</option>
+                        <option value="note">Заметка</option>
+                    </select>
+                </div>
+                <div id="material-dynamic-form-content">
+                    <!-- Dynamic form fields will be injected here -->
+                </div>
+                <button type="submit">Сохранить</button>
+            </form>
+        </div>
     </div>
     </body>
     </html>

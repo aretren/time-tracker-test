@@ -6,6 +6,10 @@
     <title>Управление проектом</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/air-datepicker@3.3.5/air-datepicker.min.css">
     <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#000000">
+    <link rel="apple-touch-icon" href="favicon.ico">
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
 </head>
 <body data-project-id="">
 
@@ -16,7 +20,8 @@
         </div>
         <div class="header-actions">
             <button id="project-help-btn" class="header-btn" title="Помощь">?</button>
-            <button type="button" id="back-to-projects-btn" class="header-back-btn">&#8592;</button>
+            <a href="#" id="back-to-participant-project-btn" class="header-btn" title="Сохранить и вернуться к проекту">&#10004;</a>
+            <button type="button" id="back-to-participant-btn" class="header-back-btn" title="Назад к списку проектов">&#8592;</button>
         </div>
     </header>
 
@@ -41,21 +46,32 @@
                 </div>
                 <ul id="training-list" class="training-list"></ul>
             </div>
-            <!-- Блок для материалов -->
             <div id="materials-widget" class="widget">
-                <h2 class="collapsible-header">Материалы</h2>
+                <div class="widget-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2 class="collapsible-header">Материалы</h2>
+                    <button id="show-add-material-modal-btn" class="header-action-btn" title="Добавить материал" style="width: auto; font-size: 1.5rem;">+</button>
+                </div>
                 <div id="materials-content" class="hidden">
                     <!-- Сюда будет загружаться контент материалов -->
                 </div>
             </div>
             <div id="participants-widget" class="widget">
-                <h2>Участники</h2>
+                <h2 class="collapsible-header">Участники</h2>
                 <ul id="participant-list" class="participant-list"></ul>
             </div>
             <div id="responsible-widget" class="widget">
                 <h2>Ответственный за проект</h2>
                 <div class="form-group">
                     <select id="responsible-user-select" class="form-group"></select>
+                </div>
+            </div>
+            <div id="project-actions-widget" class="widget hidden">
+                <h2>Действия с проектом</h2>
+                <div class="form-group">
+                     <button id="archive-project-btn" class="button">Архивировать</button>
+                </div>
+                <div class="form-group">
+                    <button id="delete-project-btn" class="button" style="background-color: var(--status-busy);">Удалить проект</button>
                 </div>
             </div>
         </div>
@@ -129,23 +145,27 @@
                             <span class="brush-legend" style="background-color: var(--status-training);"></span>
                             <p><strong>Тренировка</strong> - На этот час у участника назначена тренировка в каком-либо проекте.</p>
                         </div>
-                        <div>
-                            <span class="brush-legend" style="background-color: var(--conflict-busy-training);"></span>
-                            <p><strong>Конфликт (Занят)</strong> - Тренировка пересекается с часом, когда участник отметил, что он занят.</p>
-                        </div>
-                        <div>
-                            <span class="brush-legend" style="background-color: var(--conflict-undefined-training);"></span>
-                            <p><strong>Конфликт (Не уверен)</strong> - Тренировка пересекается с часом, где участник не определился со статусом.</p>
-                        </div>
                     </div>
                 </li>
                  <li>
-                    <strong>Управление проектом (для администратора и ответственного):</strong>
+                    <strong>Управление проектом:</strong>
+                    <p>Пользователи с ролью <strong>Администратор</strong> или <strong>Ответственный за проект</strong> имеют расширенные права на управление.</p>
                     <ul>
-                        <li><strong>Тренировки:</strong> Добавляйте, редактируйте и удаляйте тренировки для этого проекта.</li>
-                        <li><strong>Партии:</strong> Назначайте роли или музыкальные партии для каждого участника (виджет можно свернуть/развернуть).</li>
-                        <li><strong>Участники:</strong> Добавляйте или удаляйте участников из проекта (виджет можно свернуть/развернуть).</li>
-                        <li><strong>Ответственный:</strong> Назначьте одного из участников ответственным за проект. Ответственный сможет видеть эту страницу и управлять тренировками.</li>
+                        <li><strong>Тренировки:</strong> Добавляйте, редактируйте и удаляйте тренировки для этого проекта. Указывайте время, место и комментарии.</li>
+                        <li>
+                            <strong>Материалы:</strong> Этот виджет (можно свернуть/развернуть) предназначен для ведения учета по партиям, костюмам и задачам для каждого участника. Управлять материалами могут администратор и ответственный.
+                            <ul>
+                                <li><strong>Партия:</strong> Добавление музыкальной или сценической партии с описанием и фотографиями.</li>
+                                <li><strong>Костюм:</strong> Учет элементов костюма с названием, ссылкой на товар и фотографиями.</li>
+                                <li><strong>Задача:</strong> Постановка индивидуальных задач с описанием и возможностью отмечать их выполнение.</li>
+                            </ul>
+                        </li>
+                        <li><strong>Управление для администратора:</strong>
+                            <ul>
+                                <li><strong>Участники:</strong> Добавляйте или удаляйте участников из проекта (виджет можно свернуть/развернуть). При удалении участника все связанные с ним материалы также будут удалены.</li>
+                                <li><strong>Ответственный:</strong> Назначьте одного из участников ответственным за проект. Ответственный получает права на управление тренировками и материалами.</li>
+                            </ul>
+                        </li>
                     </ul>
                 </li>
             </ul>
@@ -161,6 +181,7 @@
     <div id="image-viewer-modal" class="modal">
         <span class="close-btn" id="close-image-viewer-btn">&times;</span>
         <img class="modal-content" id="image-viewer-content">
+        <button id="image-viewer-delete-btn" class="delete-photo-modal-btn" title="Удалить фото">🗑️</button>
     </div>
 
     <!-- Add Material Modal -->
@@ -168,11 +189,28 @@
         <div class="modal-content">
             <span class="close-btn">&times;</span>
             <h2>Добавить материал</h2>
-            <div id="material-type-selection">
-                <button data-type="party">Партия</button>
-                <button data-type="costume">Костюм</button>
-                <button data-type="task">Задача</button>
-            </div>
+            <form id="add-material-form" class="add-form">
+                <div class="form-group" id="material-participant-group">
+                    <label for="material-participant-select">Назначить участнику</label>
+                    <select id="material-participant-select">
+                        <!-- Options will be populated by JS -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="material-type-select">Тип материала</label>
+                    <select id="material-type-select">
+                        <option value="">-- Выберите тип --</option>
+                        <option value="party">Партия</option>
+                        <option value="costume">Костюм</option>
+                        <option value="task">Задача</option>
+                        <option value="note">Заметка</option>
+                    </select>
+                </div>
+                <div id="material-dynamic-form-content">
+                    <!-- Dynamic form fields will be injected here -->
+                </div>
+                <button type="submit">Сохранить</button>
+            </form>
         </div>
     </div>
 

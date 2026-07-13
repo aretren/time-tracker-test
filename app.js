@@ -3,18 +3,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const loggedInUser = sessionStorage.getItem('loggedInUser');
     const isAdmin = sessionStorage.getItem('isAdmin');
     const usernameDisplay = document.getElementById('username-display');
-    const adminPanelLink = document.getElementById('admin-panel-link');
-
-    if (!loggedInUser) {
-        window.location.href = 'login.html';
-        return; // Stop script execution
-    }
-    usernameDisplay.textContent = `Пользователь: ${loggedInUser}`;
-
-    if (isAdmin === 'true') {
-        adminPanelLink.classList.remove('hidden');
-    }
-
     // --- FIREBASE SETUP ---
     const firebaseConfig = {
         apiKey: "AIzaSyD2AgCF39T8Zk_kDRF6M9IHiMRz6stp_HA",
@@ -106,11 +94,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const userHasLiked = suggestion.likes && suggestion.likes[loggedInUser];
 
         let adminButtons = '';
+        let authorDeleteButton = '';
+
         if (isAdmin === 'true') {
             adminButtons = `
                 <button class="suggestion-action-btn complete-suggestion-btn" title="Исполнено">&#x2714;</button>
                 <button class="suggestion-action-btn delete-suggestion-btn" title="Удалить">&#x1F5D1;</button>
             `;
+        } else if (loggedInUser === suggestion.author) {
+            authorDeleteButton = `<button class="suggestion-action-btn delete-suggestion-btn" title="Удалить">&#x1F5D1;</button>`;
         }
 
         suggestionItem.innerHTML = `
@@ -124,6 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </button>
                     <span class="like-count">${likesCount}</span>
                     ${adminButtons}
+                    ${authorDeleteButton}
                 </div>
             </div>
         `;
@@ -877,6 +870,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+
+    
+    window.OneSignal = window.OneSignal || [];
+    OneSignal.push(function() {
+        OneSignal.init({
+            appId: "78a94261-63d9-4091-a85a-61725f3f5fa6",
+        });
+    });
+
+    if (loggedInUser) {
+        OneSignal.login(loggedInUser);
+    }
 
     const initializePage = async () => {
         generateHourlySlots(hourlyScheduleEl);

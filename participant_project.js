@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     // --- AUTH GUARD & SETUP ---
     const loggedInUser = sessionStorage.getItem('loggedInUser');
+    const isAdmin = sessionStorage.getItem('isAdmin') === 'true';
     const usernameDisplay = document.getElementById('username-display');
 
     if (!loggedInUser) {
@@ -30,126 +31,78 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
+    const projectsRef = database.ref('projects');
     const projectRef = database.ref(`projects/${projectId}`);
-
 
     // --- DOM ELEMENTS ---
     const projectNameHeader = document.getElementById('project-name-header');
     const calendarContainer = document.getElementById('calendar-container');
     const trainingListEl = document.getElementById('training-list');
     const materialsWidget = document.getElementById('materials-widget');
+    const editProjectBtn = document.getElementById('edit-project-btn');
 
-    // --- MODAL & MENU ELEMENTS ---
     const imageViewerModal = document.getElementById('image-viewer-modal');
     const closeImageViewerBtn = document.getElementById('close-image-viewer-btn');
     const imageViewerContent = document.getElementById('image-viewer-content');
-    const addMaterialMenu = document.getElementById('add-material-menu');
+    
+    const addMaterialModal = document.getElementById('add-material-modal');
+    const closeAddMaterialModalBtn = addMaterialModal.querySelector('.close-btn');
+    const showAddMaterialModalBtn = document.getElementById('show-add-material-modal-btn');
+    const addMaterialForm = document.getElementById('add-material-form');
+    const materialParticipantSelect = document.getElementById('material-participant-select');
+    const materialTypeSelect = document.getElementById('material-type-select');
+    const materialDynamicFormContent = document.getElementById('material-dynamic-form-content');
 
+    // --- STATE ---
     let calendar;
-    let currentProject = {}; // To store project data
+    let currentProject = {};
 
-    // --- PERMISSIONS ---
-    // On this page, the user can always edit their own materials.
-    const canEditMaterials = true;
+    // --- WIDGETS INITIALIZATION ---
+    if (materialsWidget) {
+        const header = materialsWidget.querySelector('.widget-header');
+        const content = document.getElementById('materials-content');
+        if (header) {
+            header.classList.add('collapsible-header');
+            materialsWidget.classList.add('collapsed');
+            content.classList.add('hidden');
+            header.addEventListener('click', (e) => {
+                // Prevent toggle when clicking the add button
+                if (e.target.id === 'show-add-material-modal-btn') return;
+                materialsWidget.classList.toggle('collapsed');
+                content.classList.toggle('hidden');
+            });
+        }
+    }
 
-    // --- MATERIALS LOGIC (Adapted from project.js) ---
-    const API_KEY = 'chv_v7pN_404b0e793451e27b444d3e9ee4e354c35359fbb9d4b8a70342659b3d9842d553c3a516066c6a2b31ddb892e00425dc8e08d1ecd26e579f55773ee79ab369f521';
+    // --- MATERIALS LOGIC ---
 
     const getMaterialInfoFromElement = (element) => {
         const item = element.closest('.material-item');
-        if (!item) return null;
-        const username = loggedInUser; // Always the current user
+        const userContainer = element.closest('.material-user-container');
+        if (!item || !userContainer) return null;
+
+        const username = userContainer.dataset.username;
         const materialType = item.dataset.type;
         const itemId = item.dataset.id;
+        
         return { username, materialType, itemId, itemEl: item };
     };
 
-    if (materialsWidget) {
-        materialsWidget.addEventListener('click', async (e) => {
-            const target = e.target;
-
-            if (target.classList.contains('add-material-btn')) {
-                showAddMaterialMenu(loggedInUser, target);
-                return;
-            }
-            if (target.classList.contains('add-photo-btn')) {
-                target.closest('.material-item').querySelector('.add-photo-input').click();
-                return;
-            }
-            if (target.closest('.photo-thumbnail') && !target.classList.contains('delete-photo-btn')) {
-                const imgSrc = target.closest('img').src;
-                if (imgSrc) {
-                    imageViewerContent.src = imgSrc;
-                    imageViewerModal.classList.add('visible');
-                }
-                return;
-            }
-            if (target.classList.contains('delete-photo-btn')) {
-                const info = getMaterialInfoFromElement(target);
-                const photoId = target.closest('.photo-thumbnail').dataset.photoid;
-                if (info && photoId && confirm('Удалить это фото?')) {
-                    projectRef.child('materials').child(info.username).child(info.materialType).child(info.itemId).child('photos').child(photoId).remove();
-                }
-                return;
-            }
-            if (target.classList.contains('toggle-task-status-btn')) {
-                const info = getMaterialInfoFromElement(target);
-                if (info) {
-                    const currentStatus = info.itemEl.classList.contains('completed') ? 'completed' : 'incomplete';
-                    const newStatus = currentStatus === 'completed' ? 'incomplete' : 'completed';
-                    projectRef.child('materials').child(info.username).child('tasks').child(info.itemId).child('status').set(newStatus);
-                }
-                return;
-            }
-            if (target.classList.contains('delete-material-btn')) {
-                const info = getMaterialInfoFromElement(target);
-                if (info && confirm('Вы уверены, что хотите удалить этот элемент?')) {
-                    projectRef.child('materials').child(info.username).child(info.materialType).child(info.itemId).remove();
-                }
-                return;
-            }
-            if (target.classList.contains('edit-material-btn')) {
-                const info = getMaterialInfoFromElement(target);
-                if (!info) return;
-                const { username, materialType, itemId, itemEl } = info;
-                const data = currentProject.materials?.[username]?.[materialType]?.[itemId];
-                if (!data) return;
-                switch (materialType) {
-                    case 'parties': renderPartyForm(itemEl, username, itemId, data); break;
-                    case 'costumes': renderCostumeForm(itemEl, username, itemId, data); break;
-                    case 'tasks': renderTaskForm(itemEl, username, itemId, data); break;
-                }
-            }
-        });
-
-        materialsWidget.addEventListener('change', async (e) => {
-            if (e.target.classList.contains('add-photo-input')) {
-                const files = e.target.files;
-                if (!files.length) return;
-                const info = getMaterialInfoFromElement(e.target);
-                if (!info) return;
-                const photosRef = projectRef.child('materials').child(info.username).child(info.materialType).child(info.itemId).child('photos');
-                for (const file of files) {
-                    const imageUrl = await uploadImage(file);
-                    if (imageUrl) photosRef.push().set(imageUrl);
-                }
-            }
-        });
-    }
-
     const uploadImage = async (file) => {
         const formData = new FormData();
-        formData.append('source', file);
-        formData.append('key', API_KEY); // Use key in form data to avoid CORS preflight
+        formData.append('image', file);
         try {
-            const response = await fetch('https://radikal.cloud/api/1/upload', {
+            const response = await fetch('https://api.imgbb.com/1/upload?key=a29a659a810c0bc31aadb00ea280227b', {
                 method: 'POST',
                 body: formData,
             });
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP error! status: ${response.status}, ${errorText}`);
+            }
             const result = await response.json();
-            if (result.status_code === 200 && result.image?.url) {
-                return result.image.url;
+            if (result.success && result.data?.url) {
+                return result.data.url;
             } else {
                 throw new Error(result.error?.message || 'URL не найден в ответе API.');
             }
@@ -159,182 +112,344 @@ document.addEventListener('DOMContentLoaded', () => {
             return null;
         }
     };
+    
+    // --- EVENT LISTENERS (outside of data load) ---
 
-    // --- CONTEXT MENU & MODAL HANDLING ---
-    const showAddMaterialMenu = (username, buttonEl) => {
-        const rect = buttonEl.getBoundingClientRect();
-        addMaterialMenu.style.top = `${rect.bottom + window.scrollY}px`;
-        addMaterialMenu.style.left = `${rect.left + window.scrollX - addMaterialMenu.offsetWidth + rect.width}px`;
-        addMaterialMenu.dataset.username = username;
-        addMaterialMenu.classList.remove('hidden');
-    };
+    if (materialsWidget) {
+        materialsWidget.addEventListener('click', async (e) => {
+            const target = e.target;
+            const info = getMaterialInfoFromElement(target);
 
-    if(addMaterialMenu) {
-        addMaterialMenu.addEventListener('click', (e) => {
-            if (e.target.classList.contains('context-menu-item')) {
-                const type = e.target.dataset.type;
-                const username = addMaterialMenu.dataset.username;
-                const container = document.querySelector(`.material-items-container[data-username="${username}"]`);
-                if (!container) return;
-                const formContainer = document.createElement('div');
-                container.prepend(formContainer);
-                switch (type) {
-                    case 'party': renderPartyForm(formContainer, username); break;
-                    case 'costume': renderCostumeForm(formContainer, username); break;
-                    case 'task': renderTaskForm(formContainer, username); break;
+            // USER-EDITABLE ACTIONS (only for their own materials)
+            const isEditableAction = ['add-photo-btn', 'toggle-task-status-btn', 'delete-material-btn', 'edit-material-btn'].some(c => target.classList.contains(c));
+            if (isEditableAction && (!info || info.username !== loggedInUser)) {
+                return;
+            }
+
+            if (target.classList.contains('add-photo-btn')) {
+                target.closest('.material-item').querySelector('.add-photo-input').click();
+            } else if (target.classList.contains('toggle-task-status-btn')) {
+                const newStatus = info.itemEl.classList.contains('completed') ? 'incomplete' : 'completed';
+                projectRef.child('materials').child(info.username).child('tasks').child(info.itemId).child('status').set(newStatus);
+            } else if (target.classList.contains('delete-material-btn')) {
+                if (confirm('Вы уверены, что хотите удалить этот элемент?')) {
+                    projectRef.child('materials').child(info.username).child(info.materialType).child(info.itemId).remove();
+                }
+            } else if (target.classList.contains('edit-material-btn')) {
+                const { username, materialType, itemId, itemEl } = info;
+                const data = currentProject.materials?.[username]?.[materialType]?.[itemId];
+                if (!data) return;
+                switch (materialType) {
+                    case 'parties': renderPartyForm(itemEl, username, itemId, data); break;
+                    case 'costumes': renderCostumeForm(itemEl, username, itemId, data); break;
+                    case 'tasks': renderTaskForm(itemEl, username, itemId, data); break;
+                    case 'notes': renderNoteForm(itemEl, username, itemId, data); break;
+                }
+            } else if (target.closest('.photo-thumbnail')) {
+                // VIEW-ONLY ACTIONS (for anyone)
+                const thumb = target.closest('.photo-thumbnail');
+                const infoForModal = getMaterialInfoFromElement(thumb);
+                const photoId = thumb.dataset.photoid;
+                const imgSrc = thumb.querySelector('img')?.src;
+                
+                if (imgSrc && infoForModal && photoId) {
+                    imageViewerContent.src = imgSrc;
+                    const deleteContext = {
+                        username: infoForModal.username,
+                        materialType: infoForModal.materialType,
+                        itemId: infoForModal.itemId,
+                        photoId: photoId
+                    };
+                    imageViewerModal.dataset.deleteContext = JSON.stringify(deleteContext);
+                    
+                    const deleteBtn = document.getElementById('image-viewer-delete-btn');
+                    deleteBtn.style.display = infoForModal.username === loggedInUser ? 'block' : 'none';
+                    imageViewerModal.classList.add('visible');
                 }
             }
-            addMaterialMenu.classList.add('hidden');
+        });
+
+        materialsWidget.addEventListener('change', async (e) => {
+            if (e.target.classList.contains('add-photo-input')) {
+                const info = getMaterialInfoFromElement(e.target);
+                if (!info || info.username !== loggedInUser) return;
+                
+                const files = e.target.files;
+                if (!files.length) return;
+                
+                const photosRef = projectRef.child('materials').child(info.username).child(info.materialType).child(info.itemId).child('photos');
+                for (const file of files) {
+                    const imageUrl = await uploadImage(file);
+                    if (imageUrl) photosRef.push().set(imageUrl);
+                }
+            }
         });
     }
 
-    if(closeImageViewerBtn) closeImageViewerBtn.addEventListener('click', () => imageViewerModal.classList.remove('visible'));
+    // --- MODAL HANDLING ---
+    const hideAddMaterialModal = () => {
+        addMaterialModal.classList.remove('visible');
+        addMaterialForm.reset();
+        materialDynamicFormContent.innerHTML = '';
+    };
 
-    window.addEventListener('click', (e) => {
-        if (addMaterialMenu && !addMaterialMenu.classList.contains('hidden') && !e.target.classList.contains('add-material-btn')) {
-            addMaterialMenu.classList.add('hidden');
+    closeAddMaterialModalBtn.addEventListener('click', hideAddMaterialModal);
+    
+    showAddMaterialModalBtn.addEventListener('click', () => {
+        addMaterialForm.reset();
+        materialDynamicFormContent.innerHTML = '';
+        document.getElementById('material-participant-group').style.display = 'none';
+        addMaterialModal.classList.add('visible');
+    });
+
+    materialTypeSelect.addEventListener('change', (e) => {
+        const type = e.target.value;
+        materialDynamicFormContent.innerHTML = '';
+        let fields = '';
+        switch (type) {
+            case 'party':
+            case 'task':
+                fields = `<div class="form-group"><input type="text" id="material-name" placeholder="Название" required></div>
+                          <div class="form-group"><textarea id="material-description" placeholder="Описание"></textarea></div>`;
+                break;
+            case 'note':
+                fields = `<div class="form-group"><input type="text" id="material-name" placeholder="Название" required></div>
+                          <div class="form-group"><textarea id="material-description" placeholder="Описание"></textarea></div>
+                          <div class="form-group"><label for="material-photo">Изображение</label><input type="file" id="material-photo" accept="image/*"></div>`;
+                break;
+            case 'costume':
+                fields = `<div class="form-group"><input type="text" id="material-name" placeholder="Название предмета" required></div>
+                          <div class="form-group"><input type="text" id="material-link" placeholder="Ссылка"></div>`;
+                break;
         }
-        if (e.target === imageViewerModal) {
+        materialDynamicFormContent.innerHTML = fields;
+    });
+
+    addMaterialForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const type = materialTypeSelect.value;
+        const name = document.getElementById('material-name')?.value.trim();
+        const photoFile = document.getElementById('material-photo')?.files[0];
+
+        if (!type || !name) {
+            alert('Пожалуйста, выберите тип и введите название.');
+            return;
+        }
+
+        let imageUrl = null;
+        if (photoFile) {
+            try {
+                imageUrl = await uploadImage(photoFile);
+            } catch (error) {
+                alert('Не удалось загрузить изображение. Попробуйте сохранить без него.');
+                return;
+            }
+        }
+
+        const targetUser = loggedInUser;
+        const materialTypePlural = type + 's';
+        let data = { name };
+
+        switch (type) {
+            case 'party':
+            case 'note':
+            case 'task':
+                data.description = document.getElementById('material-description')?.value.trim() || '';
+                if(type === 'task') data.status = 'incomplete';
+                break;
+            case 'costume':
+                data.link = document.getElementById('material-link')?.value.trim() || '';
+                break;
+        }
+        
+        if (imageUrl) {
+            data.photos = {};
+            const newPhotoKey = database.ref().push().key;
+            data.photos[newPhotoKey] = imageUrl;
+        }
+
+        projectRef.child('materials').child(targetUser).child(materialTypePlural).push().set(data);
+        hideAddMaterialModal();
+    });
+
+    if(closeImageViewerBtn) closeImageViewerBtn.addEventListener('click', () => imageViewerModal.classList.remove('visible'));
+    
+    document.getElementById('image-viewer-delete-btn').addEventListener('click', () => {
+        const context = JSON.parse(imageViewerModal.dataset.deleteContext || '{}');
+        if (context.username && context.photoId && context.username === loggedInUser && confirm('Удалить это фото?')) {
+            projectRef.child('materials').child(context.username).child(context.materialType).child(context.itemId).child('photos').child(context.photoId).remove();
             imageViewerModal.classList.remove('visible');
         }
     });
 
-    // --- MATERIAL DATA RENDERING ---
-    const renderMyMaterials = (materials = {}) => {
+    window.addEventListener('click', (e) => {
+        if (e.target === imageViewerModal) imageViewerModal.classList.remove('visible');
+        if (e.target === addMaterialModal) hideAddMaterialModal();
+    });
+
+    // --- RENDER FUNCTIONS ---
+
+    const renderMaterials = (members, materials = {}) => {
         if (!materialsWidget) return;
+
         const materialsContent = document.getElementById('materials-content');
         materialsContent.innerHTML = '';
-        const myMaterials = materials[loggedInUser] || {};
+        
+        const canAddAnyMaterial = (members && members[loggedInUser]) || isAdmin || (currentProject && currentProject.responsible === loggedInUser);
+        showAddMaterialModalBtn.style.display = canAddAnyMaterial ? 'block' : 'none';
 
-        const userContainer = document.createElement('div');
-        userContainer.className = 'material-user-container';
-        userContainer.dataset.username = loggedInUser;
+        const userSpecificMaterials = Object.keys(materials || {}).filter(u => u !== '__general' && Object.keys(materials[u]).length > 0);
+        const generalMaterialsExist = materials?.__general && Object.keys(materials.__general).length > 0;
 
-        userContainer.innerHTML = `
-            <div class="material-user-header">
-                <h3>Мои материалы</h3>
-                <button class="add-material-btn" data-username="${loggedInUser}">+</button>
-            </div>
-            <div class="material-items-container" data-username="${loggedInUser}"></div>
-        `;
-        materialsContent.appendChild(userContainer);
-        const itemsContainer = userContainer.querySelector('.material-items-container');
+        if (userSpecificMaterials.length === 0 && !generalMaterialsExist) {
+            materialsContent.innerHTML = '<p>Материалов пока нет.</p>';
+            return;
+        }
 
-        const renderAllItems = (type, renderFunc) => {
-            if (myMaterials[type]) {
-                Object.entries(myMaterials[type]).forEach(([id, data]) => {
+        const renderSection = (username) => {
+            const userMaterials = materials[username];
+            const headerText = username === '__general' ? 'Общие материалы' : username;
+            
+            // On this page, users can ONLY edit their own materials. General materials are not editable.
+            const canEdit = username === loggedInUser;
+            
+            const userContainer = document.createElement('div');
+            userContainer.className = 'material-user-container';
+            userContainer.dataset.username = username;
+            
+            userContainer.innerHTML = `<div class="material-user-header"><h3>${headerText}</h3></div>
+                                       <div class="material-items-container" data-username="${username}"></div>`;
+            materialsContent.appendChild(userContainer);
+            const itemsContainer = userContainer.querySelector('.material-items-container');
+
+            Object.keys(userMaterials).forEach(type => {
+                Object.entries(userMaterials[type]).forEach(([id, data]) => {
                     const itemContainer = document.createElement('div');
                     itemsContainer.appendChild(itemContainer);
-                    renderFunc(itemContainer, loggedInUser, id, data);
+                    switch(type) {
+                        case 'parties': renderPartyItem(itemContainer, username, id, data, canEdit); break;
+                        case 'costumes': renderCostumeItem(itemContainer, username, id, data, canEdit); break;
+                        case 'tasks': renderTaskItem(itemContainer, username, id, data, canEdit); break;
+                        case 'notes': renderNoteItem(itemContainer, username, id, data, canEdit); break;
+                    }
                 });
-            }
+            });
         };
 
-        renderAllItems('parties', renderPartyItem);
-        renderAllItems('costumes', renderCostumeItem);
-        renderAllItems('tasks', renderTaskItem);
+        // 1. Render General Materials
+        if (generalMaterialsExist) {
+            renderSection('__general');
+        }
+
+        // 2. Render User-Specific Materials
+        userSpecificMaterials.forEach(username => {
+            renderSection(username);
+        });
     };
 
-    const renderPartyItem = (container, username, partyId, partyData) => {
-        const photosHTML = partyData.photos ? Object.entries(partyData.photos).map(([photoId, url]) => `
-            <div class="photo-thumbnail" data-photoid="${photoId}"><img src="${url}" alt="Фото"><button class="delete-photo-btn">&times;</button></div>`).join('') : '';
+    const renderPartyItem = (container, username, partyId, partyData, canEdit) => {
+        const photosHTML = partyData.photos ? Object.entries(partyData.photos).map(([photoId, url]) => `<div class="photo-thumbnail" data-photoid="${photoId}"><img src="${url}" alt="Фото"></div>`).join('') : '';
+        const actionsHTML = canEdit ? `<div class="material-item-actions"><button class="edit-material-btn" title="Редактировать">✏️</button><button class="delete-material-btn" title="Удалить">🗑️</button></div>` : '';
+        const addPhotoBtnHTML = canEdit ? `<button class="add-photo-btn">Добавить фото</button>` : '';
+
         container.className = 'material-item';
         container.dataset.id = partyId;
         container.dataset.type = 'parties';
-        container.innerHTML = `
-            <div class="material-item-header">
-                <h4>Партия: ${partyData.name}</h4>
-                <div class="material-item-actions"><button class="edit-material-btn">Редактировать</button><button class="delete-material-btn">Удалить</button></div>
-            </div>
-            <p>${partyData.description || ''}</p>
-            <div class="photo-gallery">${photosHTML}</div>
-            <input type="file" class="add-photo-input" multiple accept="image/*" style="display:none;">
-            <button class="add-photo-btn">Добавить фото</button>
-        `;
+        container.innerHTML = `<div class="material-item-header"><h4>Партия: ${partyData.name}</h4>${actionsHTML}</div>
+                               <p>${partyData.description || ''}</p>
+                               <div class="photo-gallery">${photosHTML}</div>
+                               <input type="file" class="add-photo-input" multiple accept="image/*" style="display:none;">
+                               ${addPhotoBtnHTML}`;
     };
 
-    const renderCostumeItem = (container, username, costumeId, costumeData) => {
-        const photosHTML = costumeData.photos ? Object.entries(costumeData.photos).map(([photoId, url]) => `
-            <div class="photo-thumbnail" data-photoid="${photoId}"><img src="${url}" alt="Фото"><button class="delete-photo-btn">&times;</button></div>`).join('') : '';
+    const renderCostumeItem = (container, username, costumeId, costumeData, canEdit) => {
+        const photosHTML = costumeData.photos ? Object.entries(costumeData.photos).map(([photoId, url]) => `<div class="photo-thumbnail" data-photoid="${photoId}"><img src="${url}" alt="Фото"></div>`).join('') : '';
+        const actionsHTML = canEdit ? `<div class="material-item-actions"><button class="edit-material-btn" title="Редактировать">✏️</button><button class="delete-material-btn" title="Удалить">🗑️</button></div>` : '';
+        const addPhotoBtnHTML = canEdit ? `<button class="add-photo-btn">Добавить фото</button>` : '';
+        const linkHTML = costumeData.link ? `<div class="material-link-container"><a href="${costumeData.link}" target="_blank" rel="noopener noreferrer">🔗 Ссылка на товар</a></div>` : '';
+
         container.className = 'material-item';
         container.dataset.id = costumeId;
         container.dataset.type = 'costumes';
-        container.innerHTML = `
-            <div class="material-item-header">
-                <h4>Костюм: ${costumeData.name}</h4>
-                <div class="material-item-actions"><button class="edit-material-btn">Редактировать</button><button class="delete-material-btn">Удалить</button></div>
-            </div>
-            <p>${costumeData.link ? `<a href="${costumeData.link}" target="_blank">Ссылка</a>` : ''}</p>
-            <div class="photo-gallery">${photosHTML}</div>
-            <input type="file" class="add-photo-input" multiple accept="image/*" style="display:none;">
-            <button class="add-photo-btn">Добавить фото</button>
-        `;
+        container.innerHTML = `<div class="material-item-header"><h4>Костюм: ${costumeData.name}</h4>${actionsHTML}</div>
+                               ${linkHTML}
+                               <div class="photo-gallery">${photosHTML}</div>
+                               <input type="file" class="add-photo-input" multiple accept="image/*" style="display:none;">
+                               ${addPhotoBtnHTML}`;
     };
 
-    const renderTaskItem = (container, username, taskId, taskData) => {
+    const renderTaskItem = (container, username, taskId, taskData, canEdit) => {
+        const toggleBtnHTML = canEdit ? `<button class="toggle-task-status-btn" title="Изменить статус">${taskData.status === 'completed' ? '✔️' : '⭕'}</button>` : '';
+        const actionsHTML = canEdit ? `<div class="material-item-actions">${toggleBtnHTML}<button class="edit-material-btn" title="Редактировать">✏️</button><button class="delete-material-btn" title="Удалить">🗑️</button></div>` : '';
+
         container.className = `material-item task-item ${taskData.status === 'completed' ? 'completed' : ''}`;
         container.dataset.id = taskId;
         container.dataset.type = 'tasks';
-        container.innerHTML = `
-            <div class="task-content">
-                <div class="material-item-header">
-                    <h4>Задача: ${taskData.name}</h4>
-                    <div class="material-item-actions"><button class="edit-material-btn">Редактировать</button><button class="delete-material-btn">Удалить</button></div>
-                </div>
-                <p>${taskData.description}</p>
-            </div>
-            <button class="toggle-task-status-btn">${taskData.status === 'completed' ? 'Не выполнено' : 'Выполнено'}</button>
-        `;
+        container.innerHTML = `<div class="material-item-header"><h4>Задача: ${taskData.name}</h4>${actionsHTML}</div>
+                               <p>${taskData.description || ''}</p>`;
     };
 
-    // --- MATERIAL FORM RENDERING ---
-    const renderPartyForm = (container, username, partyId = null, existingData = {}) => {
-        const isEditing = !!partyId;
+    const renderNoteItem = (container, username, noteId, noteData, canEdit) => {
+        const photosHTML = noteData.photos ? Object.entries(noteData.photos).map(([photoId, url]) => `<div class="photo-thumbnail" data-photoid="${photoId}"><img src="${url}" alt="Фото заметки"></div>`).join('') : '';
+        const actionsHTML = canEdit ? `<div class="material-item-actions"><button class="edit-material-btn" title="Редактировать">✏️</button><button class="delete-material-btn" title="Удалить">🗑️</button></div>` : '';
+        const addPhotoBtnHTML = canEdit ? `<button class="add-photo-btn">Добавить фото</button>` : '';
+
+        container.className = 'material-item';
+        container.dataset.id = noteId;
+        container.dataset.type = 'notes';
+        container.innerHTML = `<div class="material-item-header"><h4>Заметка: ${noteData.name}</h4>${actionsHTML}</div>
+                               <p>${noteData.description || ''}</p>
+                               <div class="photo-gallery">${photosHTML}</div>
+                               <input type="file" class="add-photo-input" multiple accept="image/*" style="display:none;">
+                               ${addPhotoBtnHTML}`;
+    };
+
+    const createFormLogic = (container, type, username, itemId, existingData, renderItemFunc) => {
+        const isEditing = !!itemId;
+        const typeNames = { party: 'партию', costume: 'костюм', task: 'задачу', note: 'заметку' };
+        
+        let fields = `<div class="form-group"><input type="text" class="name-input" placeholder="Название" value="${existingData.name || ''}"></div>`;
+        if (type !== 'task') fields += `<div class="form-group"><textarea class="description-input" placeholder="Описание">${existingData.description || ''}</textarea></div>`;
+        if (type === 'costume') fields = `<div class="form-group"><input type="text" class="name-input" placeholder="Название" value="${existingData.name || ''}"></div>
+                                           <div class="form-group"><input type="text" class="link-input" placeholder="Ссылка" value="${existingData.link || ''}"></div>`;
+        if (type === 'task') fields += `<div class="form-group"><textarea class="description-input" placeholder="Описание">${existingData.description || ''}</textarea></div>`;
+        
         container.className = 'material-item add-form';
-        container.innerHTML = `<h4>${isEditing ? 'Редактировать' : 'Новая партия'}</h4><div class="form-group"><input type="text" p-holder="Название" value="${existingData.name || ''}"></div><div class="form-group"><textarea p-holder="Описание">${existingData.description || ''}</textarea></div><button class="save-btn">Сохранить</button><button class="cancel-btn">Отмена</button>`;
+        container.innerHTML = `<h4>${isEditing ? 'Редактировать' : 'Новая'} ${typeNames[type]}</h4>
+                               ${fields}
+                               <button class="save-btn">Сохранить</button>
+                               <button class="cancel-btn">Отмена</button>`;
+
         container.querySelector('.save-btn').onclick = () => {
-            const name = container.querySelector('input').value.trim();
+            const name = container.querySelector('.name-input').value.trim();
             if (!name) { alert('Название не может быть пустым.'); return; }
-            const description = container.querySelector('textarea').value.trim();
-            const ref = isEditing ? projectRef.child('materials').child(username).child('parties').child(partyId) : projectRef.child('materials').child(username).child('parties').push();
-            ref.set({ name, description, photos: existingData.photos || null });
+            
+            const newData = { name, photos: existingData.photos || null };
+            if (type !== 'task') newData.description = container.querySelector('.description-input')?.value.trim() || '';
+            if (type === 'costume') newData.link = container.querySelector('.link-input')?.value.trim() || '';
+            if (type === 'task') {
+                newData.description = container.querySelector('.description-input')?.value.trim() || '';
+                newData.status = existingData.status || 'incomplete';
+            }
+
+            const ref = isEditing 
+                ? projectRef.child('materials').child(username).child(type + 's').child(itemId)
+                : projectRef.child('materials').child(username).child(type + 's').push();
+            
+            ref.set(newData);
             if (!isEditing) container.remove();
         };
-        container.querySelector('.cancel-btn').onclick = () => { isEditing ? renderPartyItem(container, username, partyId, existingData) : container.remove(); };
-    };
 
-    const renderCostumeForm = (container, username, costumeId = null, existingData = {}) => {
-        const isEditing = !!costumeId;
-        container.className = 'material-item add-form';
-        container.innerHTML = `<h4>${isEditing ? 'Редактировать' : 'Новый костюм'}</h4><div class="form-group"><input type="text" p-holder="Название" value="${existingData.name || ''}"></div><div class="form-group"><input type="text" p-holder="Ссылка" value="${existingData.link || ''}"></div><button class="save-btn">Сохранить</button><button class="cancel-btn">Отмена</button>`;
-        container.querySelector('.save-btn').onclick = () => {
-            const name = container.querySelector('input[p-holder="Название"]').value.trim();
-            if (!name) { alert('Название не может быть пустым.'); return; }
-            const link = container.querySelector('input[p-holder="Ссылка"]').value.trim();
-            const ref = isEditing ? projectRef.child('materials').child(username).child('costumes').child(costumeId) : projectRef.child('materials').child(username).child('costumes').push();
-            ref.set({ name, link, photos: existingData.photos || null });
-            if (!isEditing) container.remove();
+        container.querySelector('.cancel-btn').onclick = () => {
+            isEditing ? renderItemFunc(container, username, itemId, existingData, true) : container.remove();
         };
-        container.querySelector('.cancel-btn').onclick = () => { isEditing ? renderCostumeItem(container, username, costumeId, existingData) : container.remove(); };
     };
 
-    const renderTaskForm = (container, username, taskId = null, existingData = {}) => {
-        const isEditing = !!taskId;
-        container.className = 'material-item add-form';
-        container.innerHTML = `<h4>${isEditing ? 'Редактировать' : 'Новая задача'}</h4><div class="form-group"><input type="text" p-holder="Название" value="${existingData.name || ''}"></div><div class="form-group"><textarea p-holder="Описание">${existingData.description || ''}</textarea></div><button class="save-btn">Сохранить</button><button class="cancel-btn">Отмена</button>`;
-        container.querySelector('.save-btn').onclick = () => {
-            const name = container.querySelector('input').value.trim();
-            if (!name) { alert('Название не может быть пустым.'); return; }
-            const description = container.querySelector('textarea').value.trim();
-            const ref = isEditing ? projectRef.child('materials').child(username).child('tasks').child(taskId) : projectRef.child('materials').child(username).child('tasks').push();
-            ref.set({ name, description, status: existingData.status || 'incomplete' });
-            if (!isEditing) container.remove();
-        };
-        container.querySelector('.cancel-btn').onclick = () => { isEditing ? renderTaskItem(container, username, taskId, existingData) : container.remove(); };
-    };
-
-
-    // --- ORIGINAL PAGE LOGIC (Trainings, Calendar, etc.) ---
+    const renderPartyForm = (c, u, i, d) => createFormLogic(c, 'party', u, i, d, renderPartyItem);
+    const renderCostumeForm = (c, u, i, d) => createFormLogic(c, 'costume', u, i, d, renderCostumeItem);
+    const renderTaskForm = (c, u, i, d) => createFormLogic(c, 'task', u, i, d, renderTaskItem);
+    const renderNoteForm = (c, u, i, d) => createFormLogic(c, 'note', u, i, d, renderNoteItem);
+    
     const renderProjectName = (name) => {
         projectNameHeader.textContent = name;
         document.title = name;
@@ -372,28 +487,46 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    const projectTrainingDates = new Set();
-    const otherTrainingDates = new Set();
+    const toLocalDateString = (date) => {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    };
 
-    const initializeCalendar = () => {
+    const updateProjectColorStyles = (colorHue) => {
+        const styleId = 'project-color-styles';
+        let styleElement = document.getElementById(styleId);
+        if (!styleElement) {
+            styleElement = document.createElement('style');
+            styleElement.id = styleId;
+            document.head.appendChild(styleElement);
+        }
+        styleElement.innerHTML = colorHue ? `.air-datepicker-cell.highlight-project-training { background-color: hsla(${colorHue}, 80%, 85%, 0.9); }` : '';
+    };
+
+    const initializeCalendar = (projectTrainingDates) => {
         if (calendar) calendar.destroy();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
         calendar = new AirDatepicker('#calendar-container', {
             inline: true,
             locale: { days: ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'], daysShort: ['Вос', 'Пон', 'Вто', 'Сре', 'Чет', 'Пят', 'Суб'], daysMin: ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'], months: ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'], monthsShort: ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'], today: 'Сегодня', clear: 'Очистить', dateFormat: 'dd.MM.yyyy', timeFormat: 'HH:mm', firstDay: 1 },
             onRenderCell: ({date, cellType}) => {
                 if (cellType === 'day') {
-                    const dateStr = date.toISOString().split('T')[0];
-                    if (projectTrainingDates.has(dateStr)) return { classes: 'highlight-project-training' };
-                    if (otherTrainingDates.has(dateStr)) return { classes: 'highlight-other-training' };
+                    const dateStr = toLocalDateString(date);
+                    const isPast = date < today;
+                    let classes = '';
+                    if (projectTrainingDates.has(dateStr)) classes = 'highlight-project-training';
+                    if (isPast && projectTrainingDates.has(dateStr)) classes += ' past-training';
+                    return { classes };
                 }
-            },
-            onChangeView: () => {
-                if (calendar) calendar.update();
             }
         });
     };
 
-    const projectsRef = database.ref('projects');
+    // --- MAIN DATA LISTENER ---
     projectsRef.on('value', (snapshot) => {
         const allProjects = snapshot.val();
         if (!allProjects || !allProjects[projectId]) {
@@ -402,33 +535,44 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         currentProject = allProjects[projectId];
-        if (!currentProject.members || !currentProject.members[loggedInUser]) {
+        
+        const isMember = currentProject.members && currentProject.members[loggedInUser];
+        if (!isAdmin && !isMember) {
             alert('У вас нет доступа к этому проекту.');
             window.location.href = 'participant.html';
             return;
         }
 
+        const isResponsible = currentProject.responsible === loggedInUser;
+        if (isAdmin || isResponsible) {
+            editProjectBtn.classList.remove('hidden');
+            editProjectBtn.href = `project.html?id=${projectId}`;
+        }
+
         renderProjectName(currentProject.name);
         renderTrainings(currentProject.trainings);
-        renderMyMaterials(currentProject.materials); // Render materials for the user
+        renderMaterials(currentProject.members, currentProject.materials);
 
-        projectTrainingDates.clear();
-        otherTrainingDates.clear();
-        for (const projId in allProjects) {
-            const p = allProjects[projId];
-            if (p.members && p.members[loggedInUser] && p.trainings) {
-                const isCurrent = projId === projectId;
-                Object.values(p.trainings).forEach(t => {
-                    if (t.startTime || t.time) {
-                        try {
-                            const dateStr = new Date(t.startTime || t.time).toISOString().split('T')[0];
-                            if (isCurrent) projectTrainingDates.add(dateStr); else otherTrainingDates.add(dateStr);
-                        } catch (e) { console.error("Skipping invalid date:", t.startTime || t.time); }
-                    }
-                });
-            }
+        if (currentProject.colorHue) {
+            const headerEl = projectNameHeader.closest('.app-header');
+            if(headerEl) headerEl.style.backgroundColor = `hsla(${currentProject.colorHue}, 80%, 85%, 0.75)`;
+            updateProjectColorStyles(currentProject.colorHue);
+        } else {
+            updateProjectColorStyles(null);
         }
-        if (!calendar) initializeCalendar(); else calendar.update();
+
+        const projectTrainingDates = new Set();
+        if (currentProject.trainings) {
+            Object.values(currentProject.trainings).forEach(t => {
+                if (t.startTime || t.time) {
+                    try {
+                        const dateStr = toLocalDateString(new Date(t.startTime || t.time));
+                        projectTrainingDates.add(dateStr);
+                    } catch (e) { console.error("Skipping invalid date:", t.startTime || t.time); }
+                }
+            });
+        }
+        initializeCalendar(projectTrainingDates);
     });
 
     window.addEventListener('beforeunload', () => {
