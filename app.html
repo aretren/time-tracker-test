@@ -11,6 +11,24 @@
     <link rel="apple-touch-icon" href="favicon.ico">
     <link rel="icon" href="favicon.ico" type="image/x-icon">
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <script>
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      OneSignalDeferred.push(async function(OneSignal) {
+        await OneSignal.init({
+          appId: "78a94261-63d9-4091-a85a-61725f3f5fa6",
+          safari_web_id: "web.onesignal.auto.66c7fbb6-f0f6-47ab-9f8e-1bd725d1f3d2",
+          notifyButton: {
+            enable: true,
+          },
+        });
+
+        // This is added to associate the user with the OneSignal record
+        const loggedInUser = sessionStorage.getItem('loggedInUser');
+        if (loggedInUser) {
+          OneSignal.login(loggedInUser);
+        }
+      });
+    </script>
 </head>
 <body>
 

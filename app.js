@@ -872,16 +872,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     
-    window.OneSignal = window.OneSignal || [];
-    OneSignal.push(function() {
-        OneSignal.init({
-            appId: "78a94261-63d9-4091-a85a-61725f3f5fa6",
-        });
-    });
 
-    if (loggedInUser) {
-        OneSignal.login(loggedInUser);
-    }
 
     const initializePage = async () => {
         generateHourlySlots(hourlyScheduleEl);
